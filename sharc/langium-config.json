@@ -1,0 +1,12 @@
+{
+    "projectName": "Sharc",
+    "languages": [{
+        "id": "sharc",
+        "grammar": "src/language/sharc.langium",
+        "fileExtensions": [".sho"],
+        "textMate": {
+            "out": "syntaxes/sharc.tmLanguage.json"
+        }
+    }],
+    "out": "src/language/generated"
+}

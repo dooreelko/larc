@@ -1,0 +1,16 @@
+{
+    "$schema": "https://turbo.build/schema.json",
+    "tasks": {
+        "build": {
+            "outputs": [
+                "out/**"
+            ]
+        },
+        "dev": {
+            "persistent": true,
+            "cache": false
+        },
+        "test0": {},
+        "langium:generate": {}
+    }
+}

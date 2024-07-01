@@ -1,0 +1,32 @@
+architecture "Demo" {
+    AWS Frankfurt {
+        [ category true ]
+
+        VPC {
+            ALB
+
+            ECS Fargate {}
+
+            RDS Postgres
+
+            EFS
+        }
+
+        ECR
+
+        Backup
+
+        S3
+
+    }
+}
+
+relations {
+    ALB -> ECS
+
+    ECS -> RDS
+    ECS -> EFS
+    ECS -> S3
+
+    ECS <- ECR
+}
