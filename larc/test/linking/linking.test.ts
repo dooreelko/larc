@@ -26,24 +26,32 @@ describe('Linking tests', () => {
     test('linking of greetings', async () => {
         document = await parse(`
             architecture "My arc" {
-                n1 "node 1"
+                n1 "node 1" {
+                    n3
+                }
                 n2
             }
             relations {
                 n1 -> n2
+                n3 <- n2
+                n1 -> nonode
             }
         `);
 
         const rel = document.parseResult.value as Relations;
+
         expect(
             // here we first check for validity of the parsed document object by means of the reusable function
             //  'checkDocumentValid()' to sort out (critical) typos first,
             // and then evaluate the cross references we're interested in by checking
             //  the referenced AST element as well as for a potential error message;
-            checkDocumentValid(document)
-            || rel.rels.map(r => `${r.from.ref?.name || r.from.error?.message} ${r.to.ref?.name || r.to.error?.message}`).join('\n')
+            checkDocumentValid(document) || s`
+                ${rel.rels.map(r => `${r.from.ref?.name || r.from.error?.message} || ${r.to.ref?.name || r.to.error?.message}`).join('\n')}
+            `
         ).toBe(s`
-            n1 n2
+            n1 || n2
+            n3 || n2
+            n1 || Could not resolve reference to ArchNode named 'nonode'.
         `);
     });
 });

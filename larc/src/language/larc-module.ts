@@ -1,7 +1,8 @@
-import { type Module, inject } from 'langium';
+import { AstNodeDescription, AstUtils, DefaultScopeComputation, LangiumDocument, type Module, inject } from 'langium';
 import { createDefaultModule, createDefaultSharedModule, type DefaultSharedModuleContext, type LangiumServices, type LangiumSharedServices, type PartialLangiumServices } from 'langium/lsp';
 import { LarcGeneratedModule, LarcGeneratedSharedModule } from './generated/module.js';
 import { LarcValidator, registerValidationChecks } from './larc-validator.js';
+import { isArchNode } from './generated/ast.js';
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -18,12 +19,38 @@ export type LarcAddedServices = {
  */
 export type LarcServices = LangiumServices & LarcAddedServices
 
+/*
+In LARC all identifiers must be unique so that they could be referred to from the global scope
+*/
+export class GlobalScopeComputation extends DefaultScopeComputation {
+
+    constructor(services: LangiumServices) {
+        super(services);
+    }
+
+    override async computeExports(document: LangiumDocument): Promise<AstNodeDescription[]> {
+        const exportedDescriptions: AstNodeDescription[] = [];
+        for (const childNode of AstUtils.streamAllContents(document.parseResult.value)) {
+            if (isArchNode(childNode)) {
+                const fullyQualifiedName = childNode.name;
+                // `descriptions` is our `AstNodeDescriptionProvider` defined in `DefaultScopeComputation`
+                // It allows us to easily create descriptions that point to elements using a name.
+                exportedDescriptions.push(this.descriptions.createDescription(childNode, fullyQualifiedName, document));
+            }
+        }
+        return exportedDescriptions;
+    }
+}
+
 /**
  * Dependency injection module that overrides Langium default services and contributes the
  * declared custom services. The Langium defaults can be partially specified to override only
  * selected services, while the custom services must be fully specified.
  */
 export const LarcModule: Module<LarcServices, PartialLangiumServices & LarcAddedServices> = {
+    references: {
+        ScopeComputation: (services) => new GlobalScopeComputation(services)
+    },
     validation: {
         LarcValidator: () => new LarcValidator()
     }

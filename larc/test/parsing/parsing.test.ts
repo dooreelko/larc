@@ -68,7 +68,7 @@ describe('Parsing tests', () => {
                     [ ${walkattrs(arc.attrs)} ]
                     ${arc.nodes.map(a => `${a.name}:'${a.title ?? ''}' [${walkattrs(a.attrs)}] depth: ${a.nodes.length ?? 0}`)?.join('\n')}
                 rels:
-                    ${rel.rels?.map(r => `${r.from.$refText} (${r.rel}) ${r.to.$refText} [ ${walkattrs(r.attrs)} ]`)?.join('\n')}
+                    ${rel.rels?.map(r => `${r.from.$refText}:${r.from.ref?.name} (${r.rel}) ${r.to.$refText}:${r.to.ref?.name} [ ${walkattrs(r.attrs)} ]`)?.join('\n')}
             `
         ).toBe(s`
             arc (My arc):
@@ -78,10 +78,10 @@ describe('Parsing tests', () => {
                 baz:'' [] depth: 0
                 moot:'' [woo: hoo, moo: 42] depth: 1
             rels:
-                foo (->) bar [ undefined ]
-                bar (<=) baz [ why: not ]
-                barbar (<:>) moot [ undefined ]
-                foo (--) nonode [ undefined ]
+                foo:foo (->) bar:bar [ undefined ]
+                bar:bar (<=) baz:baz [ why: not ]
+                barbar:barbar (<:>) moot:moot [ undefined ]
+                foo:foo (--) nonode:undefined [ undefined ]
         `);
     });
 });
