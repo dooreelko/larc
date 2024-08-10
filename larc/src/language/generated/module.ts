@@ -9,7 +9,7 @@ import { LarcGrammar } from './grammar.js';
 
 export const LarcLanguageMetaData = {
     languageId: 'larc',
-    fileExtensions: ['.arc'],
+    fileExtensions: ['.arc', '.larc'],
     caseInsensitive: false
 } as const satisfies LanguageMetaData;
 

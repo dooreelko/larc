@@ -1,12 +1,17 @@
 {
     "projectName": "Larc",
-    "languages": [{
-        "id": "larc",
-        "grammar": "src/language/larc.langium",
-        "fileExtensions": [".arc"],
-        "textMate": {
-            "out": "syntaxes/larc.tmLanguage.json"
+    "languages": [
+        {
+            "id": "larc",
+            "grammar": "src/language/larc.langium",
+            "fileExtensions": [
+                ".arc",
+                ".larc"
+            ],
+            "textMate": {
+                "out": "syntaxes/larc.tmLanguage.json"
+            }
         }
-    }],
+    ],
     "out": "src/language/generated"
 }
