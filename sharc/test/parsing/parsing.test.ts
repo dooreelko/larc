@@ -3,15 +3,15 @@ import { EmptyFileSystem, type LangiumDocument } from "langium";
 import { expandToString as s } from "langium/generate";
 import { parseHelper } from "langium/test";
 import { createSharcServices } from "../../src/language/sharc-module.js";
-import { Attributes, Model, Style, Styles, isModel } from "../../src/language/generated/ast.js";
+import { Attributes, Layout, Style, isLayout } from "../../src/language/generated/ast.js";
 
 let services: ReturnType<typeof createSharcServices>;
-let parse: ReturnType<typeof parseHelper<Model>>;
-let document: LangiumDocument<Model> | undefined;
+let parse: ReturnType<typeof parseHelper<Layout>>;
+let document: LangiumDocument<Layout> | undefined;
 
 beforeAll(async () => {
     services = createSharcServices(EmptyFileSystem);
-    parse = parseHelper<Model>(services.Sharc);
+    parse = parseHelper<Layout>(services.Sharc);
 
     // activate the following if your linking test requires elements from a built-in library, for example
     // await services.shared.workspace.WorkspaceManager.initializeWorkspace([]);
@@ -48,7 +48,7 @@ describe('Parsing tests', () => {
                 ]
             }
 
-            show {
+            layout {
                 // architecture is a special node derived from the architecture file above
                 architecture:title [
                     position 0:-1
@@ -135,6 +135,6 @@ function checkDocumentValid(document: LangiumDocument): string | undefined {
           ${document.parseResult.parserErrors.map(e => e.message).join('\n  ')}
     `
         || document.parseResult.value === undefined && `ParseResult is 'undefined'.`
-        || !isModel(document.parseResult.value) && `Root AST object is a ${document.parseResult.value.$type}, expected a '${Model}'.`
+        || !isLayout(document.parseResult.value) && `Root AST object is a ${document.parseResult.value.$type}, expected a '${Model}'.`
         || undefined;
 }

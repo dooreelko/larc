@@ -1,0 +1,60 @@
+architecture "src/language/example.arc"
+
+style {
+    architecture:title [
+        font-family Hasklig
+        font-size larger
+    ]
+
+    aws [
+        icon url("aws/group/AWS-Cloud_32.svg")
+        border-color black
+    ]
+
+    ecs [
+        border-style dashed
+        border-color orange
+        width 3
+        height 1
+    ]
+}
+
+layout {
+    // architecture is a special node derived from the architecture file above
+    architecture:title [
+        position 0:-1
+    ]
+
+    aws:frankfurt [
+        position 0:0
+    ]
+
+    alb [
+        left anchor(ecr:center)
+    ]
+
+    ecr [
+        top anchor(ecr:top)
+        padding-left 40pt
+    ]
+
+    rds [
+        bottom anchor(ecr:bottom)
+        left anchor(ecr:right)
+    ]
+
+    efs [
+        left anchor(ecr:left)
+        top anchor(ecr:bottom)
+    ]
+
+    s3 [
+        right anchor(ecr:right)
+        top anchor(ecr:bottom)
+    ]
+
+    backup [
+        left anchor(ecr:left)
+        top anchor(efs:top)
+    ]
+}

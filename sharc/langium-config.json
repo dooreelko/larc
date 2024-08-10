@@ -1,12 +1,28 @@
 {
     "projectName": "Sharc",
-    "languages": [{
-        "id": "sharc",
-        "grammar": "src/language/sharc.langium",
-        "fileExtensions": [".sho"],
-        "textMate": {
-            "out": "syntaxes/sharc.tmLanguage.json"
+    "languages": [
+        {
+            "id": "larc",
+            "grammar": "../larc/src/language/larc.langium",
+            "fileExtensions": [
+                ".arc",
+                ".larc"
+            ],
+            "textMate": {
+                "out": "syntaxes/larc.tmLanguage.json"
+            }
+        },
+        {
+            "id": "sharc",
+            "grammar": "src/language/sharc.langium",
+            "fileExtensions": [
+                ".sho",
+                ".sharc"
+            ],
+            "textMate": {
+                "out": "syntaxes/sharc.tmLanguage.json"
+            }
         }
-    }],
+    ],
     "out": "src/language/generated"
 }

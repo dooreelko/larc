@@ -1,6 +1,8 @@
 grammar Sharc
 
-entry Model:
+import "../../../larc/src/language/larc";
+
+entry Layout:
     architecture=ArcReference (includes+=Include | styles+=Styles | nodes+=Nodes)*;
 
 ArcReference:
@@ -19,20 +21,20 @@ StyleValue:
     name=ID value=ID;
 
 Nodes:
-    'show' '{' nodes+=Node* '}';
+    'layout' '{' nodes+=Node* '}';
 
 Node:
     name=ID Attributes?;
 
-Attributes:
-    '[' attrs+=Attribute* ']';
+// Attributes:
+//     '[' attrs+=Attribute* ']';
 
-Attribute:
-    name=ID value=ID;
+// Attribute:
+//     name=ID value=ID;
 
-hidden terminal WS: /\s+/;
-terminal ID: /[\w_][-\w_:()/."']*/;
-terminal STRING: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
+// hidden terminal WS: /\s+/;
+// terminal ID: /[\w_][-\w_:()/."%']*/;
+// terminal STRING: /"(\\.|[^"\\])*"|'(\\.|[^'\\])*'/;
 
-hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
-hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;
+// hidden terminal ML_COMMENT: /\/\*[\s\S]*?\*\//;
+// hidden terminal SL_COMMENT: /\/\/[^\n\r]*/;

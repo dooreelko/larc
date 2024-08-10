@@ -1,6 +1,6 @@
 import { type Module, inject } from 'langium';
 import { createDefaultModule, createDefaultSharedModule, type DefaultSharedModuleContext, type LangiumServices, type LangiumSharedServices, type PartialLangiumServices } from 'langium/lsp';
-import { SharcGeneratedModule, SharcGeneratedSharedModule } from './generated/module.js';
+import { LarcGeneratedModule, SharcGeneratedModule, SharcGeneratedSharedModule } from './generated/module.js';
 import { SharcValidator, registerValidationChecks } from './sharc-validator.js';
 
 /**
@@ -24,6 +24,9 @@ export type SharcServices = LangiumServices & SharcAddedServices
  * selected services, while the custom services must be fully specified.
  */
 export const SharcModule: Module<SharcServices, PartialLangiumServices & SharcAddedServices> = {
+    // references: {
+    //     Linker: (services) => new DefaultLinker(services),
+    // },
     validation: {
         SharcValidator: () => new SharcValidator()
     }
@@ -46,7 +49,8 @@ export const SharcModule: Module<SharcServices, PartialLangiumServices & SharcAd
  */
 export function createSharcServices(context: DefaultSharedModuleContext): {
     shared: LangiumSharedServices,
-    Sharc: SharcServices
+    Sharc: SharcServices,
+    Larc: SharcServices,
 } {
     const shared = inject(
         createDefaultSharedModule(context),
@@ -57,12 +61,19 @@ export function createSharcServices(context: DefaultSharedModuleContext): {
         SharcGeneratedModule,
         SharcModule
     );
+    const Larc = inject(
+        createDefaultModule({ shared }),
+        LarcGeneratedModule,
+        SharcModule
+    );
     shared.ServiceRegistry.register(Sharc);
+    shared.ServiceRegistry.register(Larc);
     registerValidationChecks(Sharc);
+    registerValidationChecks(Larc);
     if (!context.connection) {
         // We don't run inside a language server
         // Therefore, initialize the configuration provider instantly
         shared.workspace.ConfigurationProvider.initialized({});
     }
-    return { shared, Sharc };
+    return { shared, Sharc, Larc };
 }

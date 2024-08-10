@@ -1,0 +1,27 @@
+architecture "./example.arc"
+
+style {
+
+}
+
+layout {
+    // architecture is a special node derived from the architecture file above
+    architecture.title [
+        x 0
+        y 0
+    ]
+
+    aws [
+        x 0
+        y 1
+    ]
+
+    S3 [
+        x 0
+        y 0
+    ]
+
+    Lambda [
+        // left anchor(S3:right)
+    ]
+}
