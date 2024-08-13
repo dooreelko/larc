@@ -1,9 +1,8 @@
-import { expandToNode, toString } from 'langium/generate';
 import beautify from 'js-beautify';
 import { Architecture, Relations } from '@larc/larc/model';
 import { debug, fixedPass } from './layout.js';
 import { SharcModel, LayoutPass } from './typing.js';
-import { baseCss, kindToGroup, kindToId } from './css.js';
+import { baseCss, containerCss, kindToGroup, kindToId } from './css.js';
 import { awsGroupImages } from './aws-group-images.js';
 import { awsGroupCss } from './aws-groups.js';
 import { awsSingleImages } from './aws-services-images.js';
@@ -35,8 +34,8 @@ export function generateHtml(model: SharcModel) {
     const walkSingleStyles: (node: LayoutPass) => string = (node: LayoutPass) =>
         node.width === 0 || node.height === 0 ?
             `.single-${node.name} {
-                  grid-row: ${1 + (node.locationAttrs?.x ?? 0)};
-                  grid-column: ${1 + (node.locationAttrs?.y ?? 0)};
+                  grid-row: ${1 + (node.locationAttrs?.y ?? 0)};
+                  grid-column: ${1 + (node.locationAttrs?.x ?? 0)};
             }` : node.nodes
                 .flat()
                 .filter(n => !!n)
@@ -48,57 +47,6 @@ export function generateHtml(model: SharcModel) {
         </svg>
         <span class='title'> ${node.title ? `${node.name} - ${node.title}` : node.name} <span>
     </div>`;
-
-    const containerCss = `
-        .single {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            background: var(--color-shadow)
-        }
-
-        .image {
-        }
-
-        .container {
-            display: flex;
-            flex-direction: column;
-
-            // height: 100%;
-        }
-
-        .container-grid {
-            padding: 32pt;
-
-            align-items: center;
-            align-contents: center;
-            justify-items: center;
-            justify-content: center;
-
-        }
-
-        .container .header {
-            display: flex;
-            align-items: center;
-        }
-
-        .container .header .title {
-            margin-left: 8pt;
-        }
-
-        .container .header svg {
-            width: 32pt;
-            height: 32pt;
-        }
-
-        .single > .title {
-            text-align: center
-        }
-    `;
 
     const renderContainer: (node: LayoutPass) => string = (node: LayoutPass) => `
     <div id='${node.name}' class='container container-${kindToId(node.kind)} arch-${node.name} kind-${kindToGroup(node.kind)}'>
@@ -121,7 +69,7 @@ export function generateHtml(model: SharcModel) {
     </div>`;
 
 
-    const fileNode = expandToNode`
+    const html = `
         <html>
         <head>
             <title>
@@ -170,12 +118,12 @@ export function generateHtml(model: SharcModel) {
 
             ${rels.rels.map(rel => `
                 leader('${rel.from.ref?.name}', '${rel.to.ref?.name}', '${rel.attrs?.attrs.find(a => a.name === 'description')?.value ?? ''}');
-            `).join('\n')}
+            `).join('')}
 
         </script>
 
         </html>
     `;
 
-    return beautify.html(toString(fileNode));
+    return beautify.html(html);
 }

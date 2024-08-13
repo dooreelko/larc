@@ -11,7 +11,7 @@ style {
         border-color black
     ]
 
-    ecs [
+    ECS [
         border-style dashed
         border-color orange
         width 3
@@ -20,40 +20,32 @@ style {
 }
 
 layout {
-    // architecture is a special node derived from the architecture file above
-    architecture:title [
-        position 0:-1
+    ALB [
+        x 0
+        y 1
     ]
 
-    aws:frankfurt [
-        position 0:0
-    ]
-
-    alb [
-        left anchor(ecr:center)
-    ]
-
-    ecr [
-        top anchor(ecr:top)
+    ECR [
+        top anchor(ecs:top)
         padding-left 40pt
     ]
 
-    rds [
+    RDS [
         bottom anchor(ecr:bottom)
         left anchor(ecr:right)
     ]
 
-    efs [
+    EFS [
         left anchor(ecr:left)
         top anchor(ecr:bottom)
     ]
 
-    s3 [
+    S3 [
         right anchor(ecr:right)
         top anchor(ecr:bottom)
     ]
 
-    backup [
+    Backup [
         left anchor(ecr:left)
         top anchor(efs:top)
     ]

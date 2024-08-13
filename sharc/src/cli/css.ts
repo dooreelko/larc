@@ -19,6 +19,57 @@ export const kindToId = (kind: string) => {
     return knownItems[lower] ?? 'generic';
 }
 
+export const containerCss = `
+.single {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--color-shadow)
+}
+
+.image {
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+
+    // height: 100%;
+}
+
+.container-grid {
+    padding: 32pt;
+
+    align-items: center;
+    align-contents: center;
+    justify-items: center;
+    justify-content: center;
+
+}
+
+.container .header {
+    display: flex;
+    align-items: center;
+}
+
+.container .header .title {
+    margin-left: 8pt;
+}
+
+.container .header svg {
+    width: 32pt;
+    height: 32pt;
+}
+
+.single > .title {
+    text-align: center
+}
+`;
+
 export const baseCss = `
                 :root {
                     --active-brightness: 0.85;

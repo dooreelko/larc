@@ -22,11 +22,11 @@ const gatherKind: (node: ArchNode) => KindPass = (node: ArchNode) => ({
 
 const countDeep: (node: KindPass) => number = (node: KindPass) => (1 + node.nodes.flatMap(countDeep).reduce((sofar, curr) => sofar + curr, 0));
 
-const isLaid = (node?: LayoutPass) => !node || node.laid;
-const isFixed = (node?: LayoutPass) => !node || node.fixed;
+const isLaid = (node?: LayoutPass) => node?.laid;
+const isFixed = (node?: LayoutPass) => node?.fixed;
 
 const putNode = (node: LayoutPass, oldPos: XY, newPos: XY, nodes: (LayoutPass | undefined)[][]) => {
-    const old = nodes[newPos.x][newPos.y];
+    const old = nodes[newPos.y][newPos.x];
     debug(`Put ${node?.name} at (${newPos.x}:${newPos.y}), replacing: ${old?.name}`);
 
     if (isLaid(old) && isFixed(old)) {
@@ -35,8 +35,8 @@ const putNode = (node: LayoutPass, oldPos: XY, newPos: XY, nodes: (LayoutPass | 
 
     node.fixed = true;
     node.laid = true;
-    nodes[oldPos.x][oldPos.y] = old;
-    nodes[newPos.x][newPos.y] = node;
+    nodes[oldPos.y][oldPos.x] = old;
+    nodes[newPos.y][newPos.x] = node;
 
     node.locationAttrs = {
         ...node.locationAttrs!,
@@ -54,14 +54,9 @@ const putNode = (node: LayoutPass, oldPos: XY, newPos: XY, nodes: (LayoutPass | 
 const placeOneFixed = (nodes: (LayoutPass | undefined)[][]) => {
     for (let y = 0; y < nodes.length; y++) {
         for (let x = 0; x < nodes[y].length; x++) {
-            const n = nodes[x][y];
+            const n = nodes[y][x];
             if (isLaid(n)) {
                 debug(`${n?.name} is already laid`);
-                continue;
-            }
-
-            if ((n?.locationAttrs?.anchors ?? []).length > 0) {
-                debug(`${n?.name} has anchors. skipping for now`); // TODO
                 continue;
             }
 
@@ -99,6 +94,11 @@ const placeOneFixed = (nodes: (LayoutPass | undefined)[][]) => {
                 return;
             }
 
+            if ((n?.locationAttrs?.anchors ?? []).length > 0) {
+                debug(`${n?.name} has anchors. skipping for now`); // TODO
+                continue;
+            }
+
             // just leave it where it is
             debug(`Pinning ${n?.name} ${JSON.stringify(n?.locationAttrs)} as is at ${x}:${y}.`);
             n!.fixed = false;
@@ -131,7 +131,7 @@ const getLocationAttrs = (node?: Attributes) => {
         return;
     }
 
-    return {
+    const res = {
         x: parseInt(`${nodeAttr('x', node.attrs, '-1', node.name)}`),
         y: parseInt(`${nodeAttr('y', node.attrs, '-1', node.name)}`),
 
@@ -140,6 +140,10 @@ const getLocationAttrs = (node?: Attributes) => {
             .filter(anchor => !!anchor.val)
             .map(({ selfSide, val }) => parseArchor(selfSide, val))
     } as LocationAttrs;
+
+    debug(`${node.name} ${JSON.stringify(res)}`)
+
+    return res;
 }
 
 const stringNodes = (nn: (LayoutPass | undefined)[][]) =>
@@ -151,8 +155,10 @@ const firstUnlaid = (nodes: (LayoutPass | undefined)[][]) => nodes
     .flat()
     .filter(n => !!n)
     .filter(n => !!n?.locationAttrs)
-    .filter(n => n?.locationAttrs?.anchors.length === 0)
+    .filter(n => n?.locationAttrs?.anchors?.length === 0)
     .find(n => !n?.laid);
+
+const getNames: (node: ArchNode) => string[] = (node: ArchNode) => [node.name, ...node.nodes.flatMap(getNames)];
 
 export function fixedPass(model: SharcModel) {
     const arc = model.architecture.node as Architecture;
@@ -170,7 +176,18 @@ export function fixedPass(model: SharcModel) {
         nodes: node.nodes.map(gatherDepth)
     });
 
-    const allNodes = model.nodes.flatMap(n => n.nodes).reduce((sofar, curr) => ({
+    {
+        // TODO: this needs to be a validation check post parsing
+        const knownArcNodes = Object.fromEntries(arc.nodes.flatMap(getNames).map(e => [e, true]));
+
+        const badArchRefs = model.nodes.flatMap(n => n.nodes).filter(n => !knownArcNodes[n.name]).map(n => n.name);
+
+        if (badArchRefs.length) {
+            console.error(chalk.red(`WARNING. These layout nodes have no architecture counterparts: ${badArchRefs.join(', ')}`));
+        }
+    }
+
+    const layoutAttributes = model.nodes.flatMap(n => n.nodes).reduce((sofar, curr) => ({
         ...sofar,
         [curr.name]: curr as Attributes
     }), {} as Record<string, Attributes>);
@@ -185,11 +202,13 @@ export function fixedPass(model: SharcModel) {
             title: node.title,
             laid: false,
             fixed: false,
-            locationAttrs: getLocationAttrs(allNodes[node.name]),
+            locationAttrs: getLocationAttrs(layoutAttributes[node.name]),
+            foo: undefined,
 
             width: (nodes[0] ?? []).length,
             height: nodes.length,
-        };
+            nodes: []
+        } as LayoutPass;
 
 
         let maxTries = node.width * node.height;
@@ -212,9 +231,12 @@ export function fixedPass(model: SharcModel) {
 
         const fixed = nodes
             .filter(row => row.some(n => !!n))
-            .map((row, x) => row.map((n, y) => n && !n.locationAttrs ? {
+            .map((row, y) => row.map((n, x) => n && !n.locationAttrs ? {
                 ...n,
-                locationAttrs: { x, y, anchors: [] },
+                locationAttrs: {
+                    anchors: [],
+                    x, y
+                },
                 laid: true,
                 fixed: false
             } : n));
