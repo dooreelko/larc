@@ -1,13 +1,13 @@
 architecture "Demo" {
-    AWS Frankfurt {
+    AWS "Frankfurt" {
         [ category true ]
 
         VPC {
             ALB
 
-            ECS Fargate {}
+            ECS "Fargate" {}
 
-            RDS Postgres
+            RDS "Postgres"
 
             EFS
         }

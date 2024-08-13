@@ -9,7 +9,7 @@
     ],
     "type": "module",
     "scripts": {
-        "build": "tsc -b tsconfig.src.json",
+        "build": "tsc -b tsconfig.src.json && cp src/cli/*js out/cli/",
         "watch": "tsc -b tsconfig.src.json --watch",
         "lint": "eslint src --ext ts",
         "langium:generate": "langium generate",
@@ -21,10 +21,15 @@
         "@larc/larc": "*",
         "chalk": "~5.3.0",
         "commander": "~11.0.0",
+        "esbuild": "^0.21.5",
+        "handlebars": "^4.7.8",
+        "js-beautify": "^1.14.3",
         "langium": "~3.1.0",
+        "linkerline": "^1.5.0",
         "lodash": "^4.17.21"
     },
     "devDependencies": {
+        "@types/js-beautify": "^1.14.3",
         "@types/lodash": "^4.17.7",
         "@types/node": "^18.0.0",
         "@typescript-eslint/eslint-plugin": "~7.3.1",
