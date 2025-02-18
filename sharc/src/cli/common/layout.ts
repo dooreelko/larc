@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { Architecture, ArchNode, Attribute } from '@larc/larc/model';
 import type { Attributes } from '../../language/generated/ast.js';
-import { KindPass, LayoutPass, XY, Anchor, LocationAttrs, SharcModel, SecondPass } from '../typing.js';
+import { KindPass, LayoutPass, XY, Anchor, LocationAttrs, SharcModel, SecondPass, NestedXY } from '../typing.js';
 
 export const debug = (...args: unknown[]) => console.error(chalk.gray(args));
 
@@ -445,4 +445,42 @@ export const relativePass = (tree: ReturnType<typeof fixedPass>) => {
 
 
     return tree;
+};
+
+export const absPositions = (tree: LayoutPass) => {
+
+    const walkNodes: (parent: LayoutPass, node: LayoutPass) => LayoutPass = (parent: LayoutPass, node: LayoutPass) => {
+        const newNode = {
+            ...node,
+            absPosition: {
+                x: `${parent?.absPosition?.x ?? 0}.${node?.locationAttrs?.x ?? 0}`,
+                y: `${parent?.absPosition?.y ?? 0}.${node?.locationAttrs?.y ?? 0}`,
+            }
+        }
+
+        newNode.nodes = (newNode.nodes ?? []).map(nn => nn.map(n => !!n ? walkNodes(newNode, n) : undefined));
+
+        return newNode;
+    }
+
+    const newRoot = walkNodes(tree, tree);
+
+    type Abs = { name: string, abs: NestedXY };
+
+    const absLoc: (node: LayoutPass) => Abs[] = (node: LayoutPass) => [
+        {
+            name: node.name,
+            abs: node.absPosition
+        },
+        ...node.nodes
+            .flat()
+            .filter(n => !!n)
+            .flatMap(n => absLoc(n!))
+    ] as Abs[];
+
+    return absLoc(newRoot)
+        .reduce((sofar, curr) => ({
+            ...sofar,
+            [curr.name]: curr.abs
+        }), {}) as Record<string, XY>;
 };

@@ -35,6 +35,11 @@ export type XY = {
     y: number,
 }
 
+export type NestedXY = {
+    x: string,
+    y: string,
+}
+
 export type LocationAttrs = XY & { anchors: Anchor[] }
 
 export type LayoutPass = LayoutNode & {
@@ -42,6 +47,7 @@ export type LayoutPass = LayoutNode & {
     height: number,
     laid: boolean,
     fixed: boolean, // laid: true, fixed: false means the node can still be swapped
+    absPosition?: NestedXY;
     locationAttrs?: LocationAttrs,
     nodes: (LayoutPass | undefined)[][]
 };

@@ -1,6 +1,6 @@
 import { stringify } from 'yaml';
 import { LayoutPass, SharcModel } from '../typing.js';
-import { debug, fixedPass, relativePass } from '../common/layout.js';
+import { absPositions, debug, fixedPass, relativePass } from '../common/layout.js';
 import { Architecture, Relations } from '@larc/larc/model';
 import { kindToType } from './knowns.js';
 
@@ -13,27 +13,30 @@ type DacNode = {
 
 export function generateAwsDac(model: SharcModel) {
     const tree = relativePass(fixedPass(model));
+    const abses = absPositions(tree);
 
     const root = tree.nodes[0][0]!; // TODO
 
-    // debug(JSON.stringify(root, null, 2));
+    debug(JSON.stringify(root, null, 2));
+    debug(JSON.stringify(abses, null, 2));
 
     const arc = model.architecture.node as Architecture;
     const rels = model.architecture.node as Relations;
-    const styleMap = model.styles
-        .flatMap(ss => ss.nodes)
-        .map(ss => ({
-            [ss.name]: ss.styles.reduce((sofar, curr) => ({
-                ...sofar,
-                [curr.name]: curr.value
-            }), {} as Record<string, string>)
-        }))
-        .reduce((sofar, curr) => ({
-            ...sofar,
-            ...curr
-        }), {});
 
-    debug(JSON.stringify(styleMap, null, 2));
+    // const styleMap = model.styles
+    //     .flatMap(ss => ss.nodes)
+    //     .map(ss => ({
+    //         [ss.name]: ss.styles.reduce((sofar, curr) => ({
+    //             ...sofar,
+    //             [curr.name]: curr.value
+    //         }), {} as Record<string, string>)
+    //     }))
+    //     .reduce((sofar, curr) => ({
+    //         ...sofar,
+    //         ...curr
+    //     }), {});
+
+    // debug(JSON.stringify(styleMap, null, 2));
 
     const isDummy = (node: LayoutPass) => node.kind === '##dummy##';
 
@@ -101,7 +104,7 @@ export function generateAwsDac(model: SharcModel) {
                 Source: rel.from.ref?.name,
                 SourcePosition: 'E',
                 Target: rel.to.ref?.name,
-                TargetPosition: 'W',
+                TargetPosition: abses[rel.from.ref?.name ?? '']?.x < abses[rel.to.ref?.name ?? '']?.x ? 'W' : 'E',
                 TargetArrowHead: {
                     Type: 'Open'
                 },
