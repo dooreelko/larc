@@ -24,9 +24,10 @@ export type SecondPass = LayoutNode & {
 };
 
 export type Anchor = {
-    id: string,
-    ownSide: string,
-    otherSide: string
+    otherId: string,
+    ownDirection: 'top' | 'bottom' | 'left' | 'right',
+    otherSide: 'top' | 'bottom' | 'left' | 'right',
+    resolved: boolean
 };
 
 export type XY = {

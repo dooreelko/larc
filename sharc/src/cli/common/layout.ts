@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { Architecture, ArchNode, Attribute } from '@larc/larc/model';
-import type { Attributes } from '../language/generated/ast.js';
-import { KindPass, LayoutPass, XY, Anchor, LocationAttrs, SharcModel, SecondPass } from './typing.js';
+import type { Attributes } from '../../language/generated/ast.js';
+import { KindPass, LayoutPass, XY, Anchor, LocationAttrs, SharcModel, SecondPass } from '../typing.js';
 
 export const debug = (...args: unknown[]) => console.error(chalk.gray(args));
 
@@ -22,20 +22,22 @@ const gatherKind: (node: ArchNode) => KindPass = (node: ArchNode) => ({
 
 const countDeep: (node: KindPass) => number = (node: KindPass) => (1 + node.nodes.flatMap(countDeep).reduce((sofar, curr) => sofar + curr, 0));
 
-const isLaid = (node?: LayoutPass) => node?.laid;
-const isFixed = (node?: LayoutPass) => node?.fixed;
+const isLaid = (node?: LayoutPass) => !!node?.laid;
+const isFixed = (node?: LayoutPass) => !!node?.fixed;
 
 const putNode = (node: LayoutPass, oldPos: XY, newPos: XY, nodes: (LayoutPass | undefined)[][]) => {
     const old = nodes[newPos.y][newPos.x];
     debug(`Put ${node?.name} at (${newPos.x}:${newPos.y}), replacing: ${old?.name}`);
 
     if (isLaid(old) && isFixed(old)) {
-        throw new Error(`Cannot place ${node.name} at ${newPos.x}:${newPos.y} since ${old?.name} is already fixed there.`);
+        throw new Error(`Cannot place ${node.name} at ${newPos.x}:${newPos.y} since ${old?.name} from ${oldPos.x}:${oldPos.y} is already fixed there.`);
     }
 
     node.fixed = true;
     node.laid = true;
+    // if (old) {
     nodes[oldPos.y][oldPos.x] = old;
+    // }
     nodes[newPos.y][newPos.x] = node;
 
     node.locationAttrs = {
@@ -55,6 +57,11 @@ const placeOneFixed = (nodes: (LayoutPass | undefined)[][]) => {
     for (let y = 0; y < nodes.length; y++) {
         for (let x = 0; x < nodes[y].length; x++) {
             const n = nodes[y][x];
+
+            if (!n) {
+                continue;
+            }
+
             if (isLaid(n)) {
                 debug(`${n?.name} is already laid`);
                 continue;
@@ -112,8 +119,8 @@ const placeOneFixed = (nodes: (LayoutPass | undefined)[][]) => {
     }
 };
 
-const acnhorRE = /anchor\((?<id>[^:]+):(?<otherSide>[^:]+)\)/;
-const parseArchor = (selfSide: string, val: string) => {
+const acnhorRE = /anchor\((?<otherId>[^:]+):(?<otherSide>[^:]+)\)/;
+const parseArchor = (ownDirection: string, val: string) => {
     const anchor = acnhorRE.exec(val);
 
     if (val && !anchor) {
@@ -121,19 +128,20 @@ const parseArchor = (selfSide: string, val: string) => {
     }
 
     return {
-        ...(anchor?.groups as Anchor),
-        selfSide
+        ...(anchor?.groups as unknown as Anchor),
+        resolved: false,
+        ownDirection
     }
 }
 
-const getLocationAttrs = (node?: Attributes) => {
+const getLocationAttrs = (node: Attributes | undefined, xPos: number, yPos: number) => {
     if (!node) {
         return;
     }
 
     const res = {
-        x: parseInt(`${nodeAttr('x', node.attrs, '-1', node.name)}`),
-        y: parseInt(`${nodeAttr('y', node.attrs, '-1', node.name)}`),
+        x: parseInt(`${nodeAttr('x', node.attrs, `${xPos}`, node.name)}`),
+        y: parseInt(`${nodeAttr('y', node.attrs, `${yPos}`, node.name)}`),
 
         anchors: ['left', 'right', 'top', 'bottom']
             .map(selfSide => ({ selfSide, val: nodeAttr(selfSide, node.attrs, '', node.name) as string }))
@@ -148,8 +156,8 @@ const getLocationAttrs = (node?: Attributes) => {
 
 const stringNodes = (nn: (LayoutPass | undefined)[][]) =>
     nn
-        .filter(row => row.some(n => !!n))
-        .map(row => row.map(n => `${n?.name}(${n?.locationAttrs?.x}:${n?.locationAttrs?.y})[${n?.laid}]`).join('\t')).join('\n');
+        // .filter(row => row.some(n => !!n))
+        .map(row => row.map(n => !!n ? `${n?.name}(${n?.locationAttrs?.x}:${n?.locationAttrs?.y})[${n?.laid}]` : `[__]`).join('\t') + row.length).join('__\n');
 
 const firstUnlaid = (nodes: (LayoutPass | undefined)[][]) => nodes
     .flat()
@@ -193,8 +201,8 @@ export function fixedPass(model: SharcModel) {
     }), {} as Record<string, Attributes>);
 
 
-    const layNodes: (node: SecondPass) => LayoutPass = (node: SecondPass) => {
-        const nodes = Array.from(Array(node.width), (_, idx) => idx === 0 ? node.nodes.map(layNodes) : new Array(node.width)) as (LayoutPass | undefined)[][];
+    const layNodes: (node: SecondPass, xPos: number, yPos: number) => LayoutPass = (node: SecondPass, xPos: number, yPos: number) => {
+        const nodes = Array.from(Array(node.width), (_, y) => y === 0 ? node.nodes.map((n, x) => layNodes(n, x, y)) : Array.from(new Array(node.width))) as (LayoutPass | undefined)[][];
 
         const result = {
             name: node.name,
@@ -202,7 +210,7 @@ export function fixedPass(model: SharcModel) {
             title: node.title,
             laid: false,
             fixed: false,
-            locationAttrs: getLocationAttrs(layoutAttributes[node.name]),
+            locationAttrs: getLocationAttrs(layoutAttributes[node.name], xPos, yPos),
             foo: undefined,
 
             width: (nodes[0] ?? []).length,
@@ -231,15 +239,24 @@ export function fixedPass(model: SharcModel) {
 
         const fixed = nodes
             .filter(row => row.some(n => !!n))
-            .map((row, y) => row.map((n, x) => n && !n.locationAttrs ? {
-                ...n,
+            .map((row, y) => row.map((n, x) => ({
+                laid: true,
+                fixed: n?.fixed,
                 locationAttrs: {
                     anchors: [],
                     x, y
                 },
-                laid: true,
-                fixed: false
-            } : n));
+                ...n
+            }) as LayoutPass));
+        // .map((row, y) => row.map((n, x) => n && !n.locationAttrs ? {
+        //     ...n,
+        //     locationAttrs: {
+        //         anchors: [],
+        //         x, y
+        //     },
+        //     laid: true,
+        //     fixed: false
+        // } : n));
 
         const trimLeft = fixed.map(r => r.findIndex(n => !!n)).sort()[0]
 
@@ -266,6 +283,166 @@ export function fixedPass(model: SharcModel) {
         width: secondPass.length,
         height: secondPass.length,
         nodes: secondPass
-    })
+    }, 0, 0)
+}
+
+const flatNodes: (node: LayoutPass) => LayoutPass[] = (node: LayoutPass) => [node, ...(node.nodes ?? []).flat().filter(n => !!n).flatMap(n => flatNodes(n!))];
+
+export const isAnchored = (node: LayoutPass) => !!node.locationAttrs?.anchors.length;
+
+const findParent = (name: string, allNodes: LayoutPass[]) => {
+    const parent = allNodes.find(n => n.nodes.flat().some(nn => nn?.name === name));
+
+    if (!parent) {
+        throw new Error(`Node ${name} doesn't seem to be in the node tree. A typo?`)
+    }
+
+    return parent;
+}
+
+export const resizeAsNeeded = (parent: LayoutPass, x: number, y: number) => {
+    if (x < 0) {
+        parent.nodes = parent.nodes.map(n => [undefined, ...n]);
+        parent.width++;
+        return;
+    }
+
+    if (x >= parent.width) {
+        parent.nodes = parent.nodes.map(n => [...n, undefined]);
+        parent.width++;
+        return;
+    }
+
+    if (y < 0) {
+        parent.nodes = [Array.from(new Array(parent.width)), ...parent.nodes];
+        parent.height++;
+        return;
+    }
+
+    if (y >= parent.height) {
+        parent.nodes = [...parent.nodes, Array.from(new Array(parent.width))];
+        parent.height++;
+        return;
+    }
 
 }
+
+export const applyAnchor = (node: LayoutPass, parent: LayoutPass | undefined, anchor: Anchor & { otherParent?: LayoutPass, otherNode?: LayoutPass }) => {
+    if (!parent || !anchor?.otherParent) {
+        throw new Error(`For node ${node.name} either parent (${parent?.name}) or anchor parent (${anchor.otherParent}) are missing. It's a bug.`);
+    }
+
+    if (parent.name !== anchor.otherParent.name) {
+        // TODO
+        throw new Error(`Anchoring achross different parents is not yet supported. ${parent.name}:${node.name} ==> ${anchor.otherParent.name}:${anchor.otherNode?.name}`);
+    }
+
+    const directions = {
+        'left': { dx: -1, dy: 0 },
+        'right': { dx: 1, dy: 0 },
+        'top': { dx: 0, dy: -1 },
+        'bottom': { dx: 0, dy: 1 },
+    };
+
+    const { dx, dy } = directions[anchor.ownDirection];
+
+    const { x, y } = anchor.otherNode?.locationAttrs!;
+
+    let step = 1;
+    do {
+        debug(`${node.name} step ${step}`);
+        debug(`before\n`, stringNodes(parent.nodes));
+        const newx = x + dx * step;
+        const newy = y + dy * step;
+
+        if (newx < 0 || newx >= parent.width || newy < 0 || newy >= parent.height) {
+            debug(`cannot place ${node.name} at ${newx}:${newy} - need to resize parent`);
+            resizeAsNeeded(parent!, newx, newy);
+            debug(`after\n`, stringNodes(parent.nodes));
+            debug('--');
+            // return false;
+        }
+
+        const old = parent.nodes[newy][newx];
+        // debug(`Put ${node?.name} at (${newPos.x}:${newPos.y}), replacing: ${old?.name}`);
+
+        if (!isFixed(old)) {
+            putNode(node, node.locationAttrs!, { x: newx, y: newy }, parent.nodes);
+            const selfAnchor = node.locationAttrs?.anchors.find(a => a.ownDirection === anchor.ownDirection && a.otherId === anchor.otherId);
+            selfAnchor!.resolved = true;
+
+            debug(`anchored\n`, stringNodes(parent.nodes));
+            return true;
+        } else {
+            debug(`cannot place ${node.name} at ${newx}:${newy} - occpuied by ${old?.name} ${isLaid(old)} ${isFixed(old)}`);
+        }
+
+        ++step;
+
+    } while (true);
+};
+
+export const relativePass = (tree: ReturnType<typeof fixedPass>) => {
+    let pass = 0;
+    do {
+        ++pass;
+        debug(`pass ${pass}`);
+
+        const allNodes = flatNodes(tree);
+        const allNodeLookup = Object.fromEntries(allNodes.map(n => [n.name, n]));
+
+        const unlaid = allNodes
+            .filter(n => !isLaid(n))
+            .filter(isAnchored)
+            .filter(n => n.locationAttrs?.anchors.some(a => !a.resolved))
+            .map(n => ({
+                ...n,
+                parent: findParent(n.name, allNodes),
+                anchors: n.locationAttrs?.anchors.map(a => ({
+                    ...a,
+                    otherParent: findParent(a.otherId, allNodes),
+                    otherNode: allNodeLookup[a.otherId],
+                    canLay: allNodeLookup[a.otherId].laid
+                }))
+            }));
+
+        if (unlaid.length === 0) {
+            break;
+        }
+
+        const canLay = unlaid
+            .map(n => ({
+                ...n,
+                anchors: n.anchors?.filter(a => a.canLay) || []
+            }))
+            .filter(n => n.anchors.length);
+
+        if (unlaid.length && canLay.length === 0) {
+            const unresolved = unlaid.map(n => ({
+                name: n.name,
+                dependsOn: n.anchors?.map(a => a.otherId)
+            }))
+                .map(n => `${n.name} depends on ${n.dependsOn?.join(', ')}`)
+                .join('\n');
+
+            throw new Error(`After ${pass} passes, no unlaid nodes have already resolved dependencies. Looks like there's a circular one. Here's the list:\n${unresolved}`);
+        }
+
+        const laidSome = canLay.flatMap(n => n.anchors.map(a => applyAnchor(allNodeLookup[n.name], n.parent, a))).some(e => e);
+
+        if (!laidSome) {
+            const unresolved = canLay.map(n => ({
+                name: n.name,
+                dependsOn: n.anchors?.map(a => a.otherId)
+            }))
+                .map(n => `${n.name} depends on ${n.dependsOn?.join(', ')}`)
+                .join('\n');
+
+            throw new Error(`Last pass (${pass}) could not lay any nodes. Something's off...\n${unresolved}`);
+        }
+    }
+    while (true)
+
+
+    return tree;
+};

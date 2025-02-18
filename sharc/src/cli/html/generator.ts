@@ -1,7 +1,8 @@
 import beautify from 'js-beautify';
+import _ from 'lodash';
 import { Architecture, Relations } from '@larc/larc/model';
-import { debug, fixedPass } from './layout.js';
-import { SharcModel, LayoutPass } from './typing.js';
+import { debug, fixedPass, relativePass } from '../common/layout.js';
+import { SharcModel, LayoutPass } from '../typing.js';
 import { baseCss, containerCss, kindToGroup, kindToId } from './css.js';
 import { awsGroupImages } from './aws-group-images.js';
 import { awsGroupCss } from './aws-groups.js';
@@ -10,8 +11,8 @@ import { jsBundle } from './js-bundle.js';
 
 export function generateHtml(model: SharcModel) {
 
-    const tree = fixedPass(model);
-    // return JSON.stringify(, null, 2);
+    const tree = relativePass(fixedPass(model));
+
     const root = tree.nodes[0][0]!; // TODO
 
     debug(JSON.stringify(root, null, 2));
@@ -19,15 +20,25 @@ export function generateHtml(model: SharcModel) {
     const arc = model.architecture.node as Architecture;
     const rels = model.architecture.node as Relations;
 
+    const transpose = <T>(nodes: T[][]) => nodes[0].map((_, idx) => nodes.map(r => r[idx]));
+    const maxWidths = (node: LayoutPass) => transpose(node.nodes).map(col => col.map(n => n?.width ?? 0)).map(col => _.max(col) || 0);
+    const maxHeights = (node: LayoutPass) => node.nodes.map(col => col.map(n => n?.width ?? 0)).map(col => _.max(col) || 0);
+
     const walkContainerStyles: (node: LayoutPass) => string = (node: LayoutPass) => `
+        .container-${kindToId(node.kind)} {
+                  grid-row: ${1 + (node.locationAttrs?.y ?? 0)};
+                  grid-column: ${1 + (node.locationAttrs?.x ?? 0)};
+        }
         .container-${node.name}-grid {
             display: grid;
-            grid-template-columns: repeat(${node.width}, 1fr);
-            grid-template-rows: repeat(${node.height}, 1fr);
-            gap: 1em;
+            grid-template-columns: ${maxWidths(node).map(n => 1 + n).map(w => `${w}fr`).join(' ')};
+            grid-template-rows: ${maxHeights(node).map(n => 1 + n).map(h => `${h}fr`).join(' ')};
+            // grid-template-columns: repeat(${node.width}, 1fr);
+            // grid-template-rows: repeat(${node.height}, 1fr);
+            gap: 4em;
         }
     ${node.nodes.flat()
-            .filter(n => !!n)
+            .filter(n => !!n && !!n.kind)
             .filter(n => n?.width !== 0 || n?.height !== 0)
             .map(n => walkContainerStyles(n!)).join('\n')}`;
 
@@ -38,7 +49,7 @@ export function generateHtml(model: SharcModel) {
                   grid-column: ${1 + (node.locationAttrs?.x ?? 0)};
             }` : node.nodes
                 .flat()
-                .filter(n => !!n)
+                .filter(n => !!n && !!n.kind)
                 .map(n => walkSingleStyles(n!)).join('\n');
 
     const renderSingle = (node: LayoutPass) => `<div  id='${node.name}' class='single single-${node.name} kind-${node.kind}' >
@@ -60,7 +71,7 @@ export function generateHtml(model: SharcModel) {
             ${node
             .nodes
             .flat()
-            .filter(n => !!n)
+            .filter(n => !!n && !!n.kind)
             .map(n => (n?.width ?? 0) > 1 || (n?.height ?? 0) > 1 ? renderContainer(n!) : renderSingle(n!))
             .join('\n')
         }
@@ -127,3 +138,4 @@ export function generateHtml(model: SharcModel) {
 
     return beautify.html(html);
 }
+

@@ -26,12 +26,14 @@ export const containerCss = `
     align-items: center;
     justify-content: center;
 
-    width: 100%;
-    aspect-ratio: 1 / 1;
+//    width: 100%;
+//    aspect-ratio: 1 / 1;
     background: var(--color-shadow)
 }
 
 .image {
+    width: 10vmin;
+    height: 10vmin;
 }
 
 .container {
@@ -49,6 +51,7 @@ export const containerCss = `
     justify-items: center;
     justify-content: center;
 
+    grid-auto-flow: column;
 }
 
 .container .header {

@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import { SharcLanguageMetaData } from '../language/generated/module.js';
 import { createSharcServices } from '../language/sharc-module.js';
 import { extractAstNode } from './cli-util.js';
-import { generateHtml } from './generator.js';
+import { generateHtml } from './html/generator.js';
 import { NodeFileSystem } from 'langium/node';
 import * as url from 'node:url';
 import * as fs from 'node:fs/promises';
@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { createLarcServices } from '@larc/larc';
 import { Model as LarcModel } from '@larc/larc/model';
 import { Layout } from '../language/generated/ast.js';
+import { generateAwsDac } from './awsdac/generate.js';
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
 const packagePath = path.resolve(__dirname, '..', '..', 'package.json');
@@ -22,7 +23,7 @@ export const compileLarc = async (fileName: string): Promise<LarcModel> => {
 };
 
 
-export const generateAction = async (fileName: string, opts: GenerateOptions): Promise<void> => {
+export const generateUsing = (func: typeof generateHtml) => async (fileName: string, opts: GenerateOptions): Promise<void> => {
     const services = createSharcServices(NodeFileSystem).Sharc;
 
     console.error(chalk.gray(`Processing sharc...`));
@@ -51,7 +52,7 @@ export const generateAction = async (fileName: string, opts: GenerateOptions): P
     const larc = await compileLarc(larcLocation);
 
     const arcRef = sharc.architecture;
-    const generated = generateHtml({
+    const generated = func({
         ...sharc,
         architecture: {
             ...arcRef,
@@ -75,7 +76,12 @@ export default function (): void {
         .command('html')
         .argument('<file>', `sharc source file (possible file extensions: ${fileExtensions})`)
         .description('generates html representation of the sharc document')
-        .action(generateAction);
+        .action(generateUsing(generateHtml));
+    program
+        .command('dac')
+        .argument('<file>', `sharc source file (possible file extensions: ${fileExtensions})`)
+        .description('generates image representation of the sharc document using awsdac utility')
+        .action(generateUsing(generateAwsDac));
 
     program.parse(process.argv);
 }

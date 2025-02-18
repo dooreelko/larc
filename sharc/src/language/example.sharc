@@ -2,7 +2,7 @@ architecture "src/language/example.arc"
 
 style {
     architecture:title [
-        font-family Hasklig
+        font-family hasklig
         font-size larger
     ]
 
@@ -25,28 +25,33 @@ layout {
         y 1
     ]
 
-    ECR [
-        top anchor(ecs:top)
-        padding-left 40pt
-    ]
-
-    RDS [
-        bottom anchor(ecr:bottom)
-        left anchor(ecr:right)
+    ECS [
+        right anchor(ALB:left)
     ]
 
     EFS [
-        left anchor(ecr:left)
-        top anchor(ecr:bottom)
+        right anchor(ECS:left)
+        bottom anchor(ECS:bottom)
     ]
 
+    RDS [
+        top anchor(ECS:bottom)
+        right anchor(EFS:right)
+    ]
+
+    ECR [
+        //top anchor(ECS:top)
+        //padding-left 40pt
+    ]
+
+
     S3 [
-        right anchor(ecr:right)
-        top anchor(ecr:bottom)
+//        right anchor(ECR:right)
+        bottom anchor(VPC:bottom)
     ]
 
     Backup [
-        left anchor(ecr:left)
-        top anchor(efs:top)
+        right anchor(ECR:left)
+ //       top anchor(EFS:top)
     ]
 }
