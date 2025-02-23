@@ -1,0 +1,8 @@
+architecture "./doc/s3-trigger.arc"
+
+layout {
+
+    Lambda [
+        right anchor(S3:right)
+    ]
+}

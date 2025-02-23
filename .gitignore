@@ -7,3 +7,5 @@ out/
 src/language/generated/
 syntaxes/
 .turbo
+1.html
+out.dac
