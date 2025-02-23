@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { Architecture, ArchNode, Attribute } from '@larc/larc/model';
 import type { Attributes } from '../../language/generated/ast.js';
 import { KindPass, LayoutPass, XY, Anchor, LocationAttrs, SharcModel, SecondPass, NestedXY } from '../typing.js';
+import { Sparse2D } from './sparsely.js';
 
 export const debug = (...args: unknown[]) => console.error(chalk.gray(args));
 
@@ -25,96 +26,92 @@ const countDeep: (node: KindPass) => number = (node: KindPass) => (1 + node.node
 const isLaid = (node?: LayoutPass) => !!node?.laid;
 const isFixed = (node?: LayoutPass) => !!node?.fixed;
 
-const putNode = (node: LayoutPass, oldPos: XY, newPos: XY, nodes: (LayoutPass | undefined)[][]) => {
-    const old = nodes[newPos.y][newPos.x];
-    debug(`Put ${node?.name} at (${newPos.x}:${newPos.y}), replacing: ${old?.name}`);
+const putNode = (node: LayoutPass, oldPos: XY, newPos: XY, nodes: Sparse2D<LayoutPass>) => {
+    const wasHereBefore = nodes.get(newPos.x, newPos.y);
+    debug(`Put ${node?.name} at (${newPos.x}:${newPos.y}), replacing: ${wasHereBefore?.name}`);
 
-    if (isLaid(old) && isFixed(old)) {
-        throw new Error(`Cannot place ${node.name} at ${newPos.x}:${newPos.y} since ${old?.name} from ${oldPos.x}:${oldPos.y} is already fixed there.`);
+    if (isLaid(wasHereBefore) && isFixed(wasHereBefore)) {
+        throw new Error(`Cannot place ${node.name} at ${newPos.x}:${newPos.y} since ${wasHereBefore?.name} from ${oldPos.x}:${oldPos.y} is already fixed there.`);
     }
 
     node.fixed = true;
     node.laid = true;
-    // if (old) {
-    nodes[oldPos.y][oldPos.x] = old;
-    // }
-    nodes[newPos.y][newPos.x] = node;
+    nodes.delete(oldPos.x, oldPos.y);
+    nodes.put(node, newPos.x, newPos.y);
+    nodes.put(wasHereBefore, oldPos.x, oldPos.y);
 
     node.locationAttrs = {
         ...node.locationAttrs!,
         ...newPos
     }
 
-    if (old) {
-        old.locationAttrs = {
-            ...old.locationAttrs!,
+    if (wasHereBefore) {
+        wasHereBefore.locationAttrs = {
+            ...wasHereBefore.locationAttrs!,
             ...oldPos
         }
     }
 };
 
-const placeOneFixed = (nodes: (LayoutPass | undefined)[][]) => {
-    for (let y = 0; y < nodes.length; y++) {
-        for (let x = 0; x < nodes[y].length; x++) {
-            const n = nodes[y][x];
+const placeOneFixed = (nodes: Sparse2D<LayoutPass>) => {
+    for (const [{ x, y }, n] of nodes.unorderedList()) {
+        if (!n) {
+            continue;
+        }
 
-            if (!n) {
-                continue;
-            }
+        if (isLaid(n)) {
+            debug(`${n?.name} is already laid`);
+            continue;
+        }
 
-            if (isLaid(n)) {
-                debug(`${n?.name} is already laid`);
-                continue;
-            }
+        const px = n.locationAttrs?.x ?? -1;
+        const py = n.locationAttrs?.y ?? -1;
 
-            const px = n?.locationAttrs?.x ?? -1;
-            const py = n?.locationAttrs?.y ?? -1;
+        debug(`Position for ${n?.name}: (${px}:${py})`);
 
-            debug(`Position for ${n?.name}: (${px}:${py})`);
+        if (px !== -1 && py !== -1) {
+            putNode(n, { x, y }, { x: px, y: py }, nodes);
+            return;
+        }
 
-            if (px !== -1 && py !== -1) {
-                putNode(n!, { x, y }, { x: px, y: py }, nodes);
+        if (px !== -1 && py === -1) {
+            const swaps = nodes.toArray().map(n => n[x]);
+            const ny = swaps.findIndex(n => !isLaid(n));
+
+            if (ny === -1) {
+                putNode(n!, { x, y }, { x: px, y: nodes.dims().maxy + 1 }, nodes);
                 return;
             }
 
-            if (px !== -1 && py === -1) {
-                const swaps = nodes.map(n => n[x]);
-                const ny = swaps.findIndex(n => !isLaid(n));
+            putNode(n!, { x, y }, { x: px, y: ny }, nodes);
+            return;
+        }
 
-                if (ny === -1) {
-                    throw new Error(`Cannot place ${n?.name} somewhere at col ${px} - all occupied bz: ${swaps.map(n => n?.name).join(', ')}`)
-                }
+        if (py !== -1 && px === -1) {
+            const swaps = nodes.toArray()[py];
+            const nx = swaps.findIndex(n => !isLaid(n));
 
-                putNode(n!, { x, y }, { x: px, y: ny }, nodes);
+            if (nx === -1) {
+                putNode(n!, { x, y }, { x: nodes.dims().maxx + 1, y: py }, nodes);
                 return;
             }
 
-            if (py !== -1 && px === -1) {
-                const swaps = nodes[py];
-                const nx = swaps.findIndex(n => !isLaid(n));
+            putNode(n!, { x, y }, { x: nx, y: py }, nodes);
+            return;
+        }
 
-                if (nx === -1) {
-                    throw new Error(`Cannot place ${n?.name} somewhere at row ${py} - all occupied bz: ${swaps.map(n => n?.name).join(', ')}`)
-                }
+        if ((n?.locationAttrs?.anchors ?? []).length > 0) {
+            debug(`${n?.name} has anchors. skipping for now`); // TODO
+            continue;
+        }
 
-                putNode(n!, { x, y }, { x: nx, y: py }, nodes);
-                return;
-            }
-
-            if ((n?.locationAttrs?.anchors ?? []).length > 0) {
-                debug(`${n?.name} has anchors. skipping for now`); // TODO
-                continue;
-            }
-
-            // just leave it where it is
-            debug(`Pinning ${n?.name} ${JSON.stringify(n?.locationAttrs)} as is at ${x}:${y}.`);
-            n!.fixed = false;
-            n!.laid = true;
-            n!.locationAttrs = {
-                anchors: n?.locationAttrs?.anchors ?? [],
-                x, y
-            }
-
+        // just leave it where it is
+        debug(`Pinning ${n?.name} ${JSON.stringify(n?.locationAttrs)} as is at ${x}:${y}.`);
+        n!.fixed = false;
+        n!.laid = true;
+        n!.locationAttrs = {
+            anchors: n?.locationAttrs?.anchors ?? [],
+            x, y
         }
     }
 };
@@ -136,7 +133,7 @@ const parseArchor = (ownDirection: string, val: string) => {
 
 const getLocationAttrs = (node: Attributes | undefined, xPos: number, yPos: number) => {
     if (!node) {
-        return;
+        return { x: xPos, y: yPos, anchors: [] };
     }
 
     const res = {
@@ -149,8 +146,6 @@ const getLocationAttrs = (node: Attributes | undefined, xPos: number, yPos: numb
             .map(({ selfSide, val }) => parseArchor(selfSide, val))
     } as LocationAttrs;
 
-    debug(`${node.name} ${JSON.stringify(res)}`)
-
     return res;
 }
 
@@ -159,8 +154,9 @@ const stringNodes = (nn: (LayoutPass | undefined)[][]) =>
         // .filter(row => row.some(n => !!n))
         .map(row => row.map(n => !!n ? `${n?.name}(${n?.locationAttrs?.x}:${n?.locationAttrs?.y})[${n?.laid}]` : `[__]`).join('\t') + row.length).join('__\n');
 
-const firstUnlaid = (nodes: (LayoutPass | undefined)[][]) => nodes
-    .flat()
+const firstUnlaid = (nodes: Sparse2D<LayoutPass>) => nodes
+    .unorderedList()
+    .map(([_, el]) => el)
     .filter(n => !!n)
     .filter(n => !!n?.locationAttrs)
     .filter(n => n?.locationAttrs?.anchors?.length === 0)
@@ -202,7 +198,7 @@ export function fixedPass(model: SharcModel) {
 
 
     const layNodes: (node: SecondPass, xPos: number, yPos: number) => LayoutPass = (node: SecondPass, xPos: number, yPos: number) => {
-        const nodes = Array.from(Array(node.width), (_, y) => y === 0 ? node.nodes.map((n, x) => layNodes(n, x, y)) : Array.from(new Array(node.width))) as (LayoutPass | undefined)[][];
+        const nodes = Sparse2D.from(node.nodes.map((n, idx) => [layNodes(n, 0, idx)]));
 
         const result = {
             name: node.name,
@@ -213,8 +209,8 @@ export function fixedPass(model: SharcModel) {
             locationAttrs: getLocationAttrs(layoutAttributes[node.name], xPos, yPos),
             foo: undefined,
 
-            width: (nodes[0] ?? []).length,
-            height: nodes.length,
+            width: nodes.width,
+            height: nodes.height,
             nodes: []
         } as LayoutPass;
 
@@ -222,10 +218,10 @@ export function fixedPass(model: SharcModel) {
         let maxTries = node.width * node.height;
         debug(`Laying ${node.name} ${maxTries}`);
 
-        debug(stringNodes(nodes));
+        debug(stringNodes(nodes.toArray()));
         while (maxTries > 0 && !!firstUnlaid(nodes)) {
             placeOneFixed(nodes);
-            debug(stringNodes(nodes));
+            debug(stringNodes(nodes.toArray()));
 
             --maxTries;
         }
@@ -234,100 +230,54 @@ export function fixedPass(model: SharcModel) {
 
         if (!!firstBad) {
             throw new Error(`Couldn't lay at least ${firstBad.name} with ${JSON.stringify(firstBad.locationAttrs)}, here's what came out:
-                ${stringNodes(nodes)}`)
+                ${stringNodes(nodes.toArray())}`)
         }
 
-        const fixed = nodes
-            .filter(row => row.some(n => !!n))
-            .map((row, y) => row.map((n, x) => ({
-                laid: true,
-                fixed: n?.fixed,
-                locationAttrs: {
-                    anchors: [],
-                    x, y
-                },
-                ...n
-            }) as LayoutPass));
-        // .map((row, y) => row.map((n, x) => n && !n.locationAttrs ? {
-        //     ...n,
-        //     locationAttrs: {
-        //         anchors: [],
-        //         x, y
-        //     },
-        //     laid: true,
-        //     fixed: false
-        // } : n));
-
-        const trimLeft = fixed.map(r => r.findIndex(n => !!n)).sort()[0]
-
-        const leftTrimmed = fixed.map(row => row.slice(trimLeft));
-
-        const trimRight = leftTrimmed.map(r => r.findLastIndex(n => !!n)).sort().slice(-1)[0];
-
-        const rightTrimmed = fixed.map(row => row.slice(0, trimRight + 1));
-
-        debug(`DONE Laying ${node.name}`);
-        debug(stringNodes(rightTrimmed));
         return {
             ...result,
-            width: rightTrimmed.length ? rightTrimmed[0].length : 0,
-            height: rightTrimmed.length,
-            nodes: rightTrimmed
+            width: nodes.width,
+            height: nodes.height,
+            nodes: nodes.toArray().map((row, y) => row.map((n, x) => (!n ? undefined : {
+                ...n,
+                locationAttrs: {
+                    anchors: n.locationAttrs?.anchors || [],
+                    x,
+                    y
+                }
+            })))
         };
     };
 
     const secondPass = kinded.map(gatherDepth);
-    return layNodes({
+    const result = layNodes({
         name: 'root',
         kind: 'root',
         width: secondPass.length,
         height: secondPass.length,
         nodes: secondPass
-    }, 0, 0)
+    }, 0, 0);
+
+    debug(`DONE Fixed PASS`);
+    debug(stringNodes(result.nodes));
+
+    return result;
 }
 
 const flatNodes: (node: LayoutPass) => LayoutPass[] = (node: LayoutPass) => [node, ...(node.nodes ?? []).flat().filter(n => !!n).flatMap(n => flatNodes(n!))];
 
 export const isAnchored = (node: LayoutPass) => !!node.locationAttrs?.anchors.length;
 
-const findParent = (name: string, allNodes: LayoutPass[]) => {
-    const parent = allNodes.find(n => n.nodes.flat().some(nn => nn?.name === name));
+const findParent = (name: string, allNodes: { node: LayoutPass, laid: boolean }[]) => {
+    const parent = allNodes.find(n => n.node.nodes.flat().some(nn => nn?.name === name));
 
     if (!parent) {
         throw new Error(`Node ${name} doesn't seem to be in the node tree. A typo?`)
     }
 
-    return parent;
+    return parent.node;
 }
 
-export const resizeAsNeeded = (parent: LayoutPass, x: number, y: number) => {
-    if (x < 0) {
-        parent.nodes = parent.nodes.map(n => [undefined, ...n]);
-        parent.width++;
-        return;
-    }
-
-    if (x >= parent.width) {
-        parent.nodes = parent.nodes.map(n => [...n, undefined]);
-        parent.width++;
-        return;
-    }
-
-    if (y < 0) {
-        parent.nodes = [Array.from(new Array(parent.width)), ...parent.nodes];
-        parent.height++;
-        return;
-    }
-
-    if (y >= parent.height) {
-        parent.nodes = [...parent.nodes, Array.from(new Array(parent.width))];
-        parent.height++;
-        return;
-    }
-
-}
-
-export const applyAnchor = (node: LayoutPass, parent: LayoutPass | undefined, anchor: Anchor & { otherParent?: LayoutPass, otherNode?: LayoutPass }) => {
+export const applyAnchor = (node: LayoutPass, parent: LayoutPass, anchor: Anchor & { otherParent?: LayoutPass, otherNode?: LayoutPass }) => {
     if (!parent || !anchor?.otherParent) {
         throw new Error(`For node ${node.name} either parent (${parent?.name}) or anchor parent (${anchor.otherParent}) are missing. It's a bug.`);
     }
@@ -346,31 +296,35 @@ export const applyAnchor = (node: LayoutPass, parent: LayoutPass | undefined, an
 
     const { dx, dy } = directions[anchor.ownDirection];
 
+    // TODO: this effectively ignores any previous anchors, somehow we need
+    // to find the starting position that is commonly acceptable for all anchored nodes
     const { x, y } = anchor.otherNode?.locationAttrs!;
 
     let step = 1;
+
     do {
         debug(`${node.name} step ${step}`);
         debug(`before\n`, stringNodes(parent.nodes));
+
+        const sparseNodes = Sparse2D.from(parent.nodes);
         const newx = x + dx * step;
         const newy = y + dy * step;
 
-        if (newx < 0 || newx >= parent.width || newy < 0 || newy >= parent.height) {
-            debug(`cannot place ${node.name} at ${newx}:${newy} - need to resize parent`);
-            resizeAsNeeded(parent!, newx, newy);
-            debug(`after\n`, stringNodes(parent.nodes));
-            debug('--');
-            // return false;
-        }
-
-        const old = parent.nodes[newy][newx];
-        // debug(`Put ${node?.name} at (${newPos.x}:${newPos.y}), replacing: ${old?.name}`);
+        const old = sparseNodes.get(newx, newy);
 
         if (!isFixed(old)) {
-            putNode(node, node.locationAttrs!, { x: newx, y: newy }, parent.nodes);
+            putNode(node, node.locationAttrs!, { x: newx, y: newy }, sparseNodes);
             const selfAnchor = node.locationAttrs?.anchors.find(a => a.ownDirection === anchor.ownDirection && a.otherId === anchor.otherId);
             selfAnchor!.resolved = true;
 
+            parent.nodes = sparseNodes.toArray().map((row, y) => row.map((n, x) => (!n ? undefined : {
+                ...n,
+                locationAttrs: {
+                    anchors: n.locationAttrs?.anchors || [],
+                    x,
+                    y
+                }
+            })));
             debug(`anchored\n`, stringNodes(parent.nodes));
             return true;
         } else {
@@ -388,17 +342,24 @@ export const relativePass = (tree: ReturnType<typeof fixedPass>) => {
         ++pass;
         debug(`pass ${pass}`);
 
-        const allNodes = flatNodes(tree);
-        const allNodeLookup = Object.fromEntries(allNodes.map(n => [n.name, n]));
+        const allNodes = flatNodes(tree)
+            .map(n => ({
+                node: n,
+                laid: n.laid || !!n.locationAttrs?.anchors.every(a => a.resolved)
+            }));
+
+        // debug(JSON.stringify(allNodes.map(n => ({ name: n.node.name, laid: n.laid, x: n.node.locationAttrs?.x, y: n.node.locationAttrs?.y })), null, 2));
+
+        const allNodeLookup = Object.fromEntries(allNodes.map(n => [n.node.name, n.node]));
 
         const unlaid = allNodes
-            .filter(n => !isLaid(n))
-            .filter(isAnchored)
-            .filter(n => n.locationAttrs?.anchors.some(a => !a.resolved))
+            .filter(n => !isLaid(n.node))
+            .filter(n => isAnchored(n.node))
+            .filter(n => n.node.locationAttrs?.anchors.some(a => !a.resolved))
             .map(n => ({
                 ...n,
-                parent: findParent(n.name, allNodes),
-                anchors: n.locationAttrs?.anchors.map(a => ({
+                parent: findParent(n.node.name, allNodes),
+                anchors: n.node.locationAttrs?.anchors.map(a => ({
                     ...a,
                     otherParent: findParent(a.otherId, allNodes),
                     otherNode: allNodeLookup[a.otherId],
@@ -419,20 +380,21 @@ export const relativePass = (tree: ReturnType<typeof fixedPass>) => {
 
         if (unlaid.length && canLay.length === 0) {
             const unresolved = unlaid.map(n => ({
-                name: n.name,
+                name: n.node.name,
                 dependsOn: n.anchors?.map(a => a.otherId)
             }))
-                .map(n => `${n.name} depends on ${n.dependsOn?.join(', ')}`)
+                .map(n => `${n.name} depends on ${n.dependsOn?.join(', ')} ${n.dependsOn?.map(i => allNodeLookup[i].laid).join(', ')}`)
                 .join('\n');
 
             throw new Error(`After ${pass} passes, no unlaid nodes have already resolved dependencies. Looks like there's a circular one. Here's the list:\n${unresolved}`);
         }
 
-        const laidSome = canLay.flatMap(n => n.anchors.map(a => applyAnchor(allNodeLookup[n.name], n.parent, a))).some(e => e);
+        // XXX: i've no idea where they get desync but n.parent.nodes.flat().find(mn => mn?.name === n.node.name)! does the trick
+        const laidSome = canLay.flatMap(n => n.anchors.map(a => applyAnchor(n.parent.nodes.flat().find(mn => mn?.name === n.node.name)!, n.parent, a))).some(e => e);
 
         if (!laidSome) {
             const unresolved = canLay.map(n => ({
-                name: n.name,
+                name: n.node.name,
                 dependsOn: n.anchors?.map(a => a.otherId)
             }))
                 .map(n => `${n.name} depends on ${n.dependsOn?.join(', ')}`)

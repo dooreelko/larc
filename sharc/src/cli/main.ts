@@ -59,7 +59,7 @@ export const generateUsing = (func: typeof generateHtml) => async (fileName: str
             node: larc
         }
     });
-    console.error(chalk.green(`Html generated successfully`));
+    console.error(chalk.green(`Generation successful`));
     console.log(generated);
 };
 

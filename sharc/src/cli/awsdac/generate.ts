@@ -1,12 +1,12 @@
 import { stringify } from 'yaml';
 import { LayoutPass, SharcModel } from '../typing.js';
-import { absPositions, debug, fixedPass, relativePass } from '../common/layout.js';
+import { absPositions, fixedPass, relativePass } from '../common/layout.js';
 import { Architecture, Relations } from '@larc/larc/model';
 import { kindToType } from './knowns.js';
 
 type DacNode = {
     Type: string,
-    Tite?: string,
+    Title?: string,
     Direction?: string,
     Children: string[]
 };
@@ -17,8 +17,8 @@ export function generateAwsDac(model: SharcModel) {
 
     const root = tree.nodes[0][0]!; // TODO
 
-    debug(JSON.stringify(root, null, 2));
-    debug(JSON.stringify(abses, null, 2));
+    // debug(JSON.stringify(root, null, 2));
+    // debug(JSON.stringify(abses, null, 2));
 
     const arc = model.architecture.node as Architecture;
     const rels = model.architecture.node as Relations;
@@ -54,6 +54,7 @@ export function generateAwsDac(model: SharcModel) {
             .map((row, idx) => ({
                 [`${node.name}-row-${idx}`]: {
                     Type: 'AWS::Diagram::HorizontalStack',
+                    // Align: 'top',
                     Direction: 'horizontal',
                     Children: row
                         .map((n, col) => n?.name ?? `${node.name}-row-${idx}-dummy-${col}`)

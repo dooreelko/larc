@@ -31,15 +31,16 @@ layout {
 
     EFS [
         right anchor(ECS:left)
-        bottom anchor(ECS:bottom)
+//        bottom anchor(ECS:bottom)
     ]
 
     RDS [
         top anchor(ECS:bottom)
-        right anchor(EFS:right)
+        //right anchor(EFS:right)
     ]
 
     ECR [
+        right anchor(VPC:right)
         //top anchor(ECS:top)
         //padding-left 40pt
     ]
