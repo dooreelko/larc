@@ -2,8 +2,8 @@ grammar Sharc
 
 import "../../../larc/src/language/larc";
 
-entry Layout:
-    architecture=ArcReference (includes+=Include | styles+=Styles | nodes+=Nodes)*;
+entry Sharc:
+    architecture=ArcReference (includes+=Include | styles+=Styles | layout+=Layout)*;
 
 ArcReference:
     'architecture' location=STRING;
@@ -20,11 +20,11 @@ Style:
 StyleValue:
     name=ID value=ID;
 
-Nodes:
-    'layout' '{' nodes+=Node* '}';
+Layout:
+    'layout' '{' layouts+=LayoutAttribute* '}';
 
-Node:
-    name=ID Attributes?;
+LayoutAttribute:
+    name=ID Attributes;
 
 // Attributes:
 //     '[' attrs+=Attribute* ']';

@@ -26,33 +26,33 @@ layout {
     ]
 
     ECS [
-        right anchor(ALB:left)
+        right of(ALB)
     ]
 
     EFS [
-        right anchor(ECS:left)
-//        bottom anchor(ECS:bottom)
+//        left of(ECS)
+        below of(ECS)
     ]
 
     RDS [
-        top anchor(ECS:bottom)
-        //right anchor(EFS:right)
+        below of(ECS)
+        //left of(EFS)
     ]
 
     ECR [
-        right anchor(VPC:right)
-        //top anchor(ECS:top)
+        right of(VPC)
+        //above of(ECS)
         //padding-left 40pt
     ]
 
 
     S3 [
 //        right anchor(ECR:right)
-        bottom anchor(VPC:bottom)
+        below of(VPC)
     ]
 
     Backup [
-        right anchor(ECR:left)
+        right of(ECR)
  //       top anchor(EFS:top)
     ]
 }

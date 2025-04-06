@@ -9,25 +9,26 @@ import * as url from 'node:url';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { createLarcServices } from '@larc/larc';
-import { Model as LarcModel } from '@larc/larc/model';
-import { Layout } from '../language/generated/ast.js';
+import { Model as Larc } from '@larc/larc/model';
+import { Sharc } from '../language/generated/ast.js';
 import { generateAwsDac } from './awsdac/generate.js';
+
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
 const packagePath = path.resolve(__dirname, '..', '..', 'package.json');
 const packageContent = await fs.readFile(packagePath, 'utf-8');
 
-export const compileLarc = async (fileName: string): Promise<LarcModel> => {
+export const compileLarc = async (fileName: string): Promise<Larc> => {
     const services = createLarcServices(NodeFileSystem).Larc;
-    return extractAstNode<LarcModel>(fileName, services);
+    return extractAstNode<Larc>(fileName, services);
 };
 
 
-export const generateUsing = (func: typeof generateHtml) => async (fileName: string, opts: GenerateOptions): Promise<void> => {
+export const generateUsing = (func: (layout: Sharc, larc: Larc) => string) => async (fileName: string, opts: GenerateOptions): Promise<void> => {
     const services = createSharcServices(NodeFileSystem).Sharc;
 
     console.error(chalk.gray(`Processing sharc...`));
-    const sharc = await extractAstNode<Layout>(fileName, services);
+    const sharc = await extractAstNode<Sharc>(fileName, services);
 
     console.error(chalk.gray(`Linking larc...`));
 
@@ -51,14 +52,10 @@ export const generateUsing = (func: typeof generateHtml) => async (fileName: str
     path.dirname(fileName)
     const larc = await compileLarc(larcLocation);
 
-    const arcRef = sharc.architecture;
-    const generated = func({
-        ...sharc,
-        architecture: {
-            ...arcRef,
-            node: larc
-        }
-    });
+    const generated = func(
+        sharc,
+        larc 
+    );
     console.error(chalk.green(`Generation successful`));
     console.log(generated);
 };

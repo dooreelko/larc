@@ -39,7 +39,7 @@ export class Sparse2D<T> {
         return this.elems[this.addr(x, y)]?.[1];
     }
 
-    public dims() {
+    public get dims() {
         return Object.entries(this.elems).reduce((sofar, curr) => ({
             minx: Math.min(sofar.minx, curr[1][0].x),
             maxx: Math.max(sofar.maxx, curr[1][0].x),
@@ -51,14 +51,6 @@ export class Sparse2D<T> {
             miny: Number.POSITIVE_INFINITY,
             maxy: Number.NEGATIVE_INFINITY
         });
-    }
-
-    get width(): number {
-        return 0;
-    }
-
-    get height(): number {
-        return 0;
     }
 
     unorderedList(): [pos: XY, el: T][] {
@@ -76,7 +68,7 @@ export class Sparse2D<T> {
             return [];
         }
 
-        const dims = this.dims();
+        const dims = this.dims;
 
         const res = Array.from(Array(dims.maxy - dims.miny + 1), a => Array(dims.maxx - dims.minx + 1).fill(undefined));
 
